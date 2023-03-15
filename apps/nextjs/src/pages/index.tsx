@@ -1,7 +1,6 @@
 import { useState } from "react";
 import type { NextPage } from "next";
 import Head from "next/head";
-import Link from "next/link";
 
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -54,7 +53,6 @@ const CreatePostForm: React.FC = () => {
           {error.data.zodError.fieldErrors.title}
         </span>
       )}
-      <Link href="/yoo">Hello</Link>
       <input
         className="mb-2 rounded bg-white/10 p-2 text-white"
         value={content}
@@ -98,7 +96,7 @@ const Home: NextPage = () => {
       <main className="flex h-screen flex-col items-center bg-gradient-to-b from-[#2e026d] to-[#15162c] text-white">
         <div className="container mt-12 flex flex-col items-center justify-center gap-4 px-4 py-8">
           <h1 className="text-5xl font-extrabold tracking-tight sm:text-[5rem]">
-            Create <span className="text-pink-400">T3</span> Turbo
+            Lill<span className="text-pink-400">IA</span>
           </h1>
 
           <CreatePostForm />
