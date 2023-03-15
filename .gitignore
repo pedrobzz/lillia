@@ -46,3 +46,4 @@ yarn-error.log*
 
 # turbo
 .turbo
+packages/db/prisma/db.sqlite
