@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-misused-promises */
 import { useState } from "react";
 import type { NextPage } from "next";
 import Head from "next/head";
@@ -86,6 +87,8 @@ const Home: NextPage = () => {
     onSettled: () => postQuery.refetch(),
   });
 
+  const {mutateAsync: tellJoke} = api.openAi.tellJoke.useMutation();
+
   return (
     <>
       <Head>
@@ -100,6 +103,14 @@ const Home: NextPage = () => {
           </h1>
 
           <CreatePostForm />
+
+          <button onClick={async () => {
+            const prompt = "Javascript";
+            const response = await tellJoke({ prompt });
+            console.log({ response, prompt })
+          }}>
+            send prompt
+          </button>
 
           {postQuery.data ? (
             <div className="w-full max-w-2xl">
