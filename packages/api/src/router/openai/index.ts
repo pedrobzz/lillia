@@ -18,7 +18,7 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 interface Action {
-  handle: (input: unknown) => Promise<unknown>;
+  handle: (input: unknown) => Promise<Record<string, unknown>>;
   input: unknown;
   schema?: z.ZodSchema<unknown>;
 }
@@ -143,18 +143,14 @@ export const openAiRouter = createTRPCRouter({
         console.log(completion.data.usage);
         console.log("===============");
 
-        let jsonResult: any = null;
+        let jsonResult: Record<string, unknown> | null = null;
 
         const response = convertInputIntoAction(
           completion.data.choices[0]?.message?.content ?? "{}",
         );
-        console.log(
-          `${input.prompt}:${completion.data.choices[0]?.message?.content}\n\n`,
-        );
 
         if (response) {
           const { handle, input } = response;
-          console.log(response);
           const result = await handle(input);
           jsonResult = result;
         }
