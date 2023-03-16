@@ -21,6 +21,7 @@ interface Action {
   handle: (input: unknown) => Promise<Record<string, unknown>>;
   input: unknown;
   schema?: z.ZodSchema<unknown>;
+  preprocess?: (input: unknown) => unknown;
 }
 
 const actionsToChatGPT = {
@@ -41,10 +42,9 @@ const actions = {
     } as CreatePostSchema,
     handle: (input: unknown) => {
       const parsed = createPostSchema.safeParse(input);
-      if (parsed.success) {
-        return createPost(parsed.data);
-      }
-      throw new Error("Invalid input");
+      if (!parsed.success) throw new Error("Invalid input");
+
+      return createPost(parsed.data);
     },
   },
 } satisfies Record<keyof typeof actionsToChatGPT, Action>;
@@ -53,7 +53,10 @@ const convertInputIntoAction = (input: string): Action | null => {
   const inputAsJson = JSON.parse(input);
 
   const aiSchema = z.object({
-    action: z.string(),
+    action: z
+      .string()
+      .refine((x) => x in actions)
+      .transform((x) => x as keyof typeof actions),
     input: z.any(),
   });
 
@@ -72,6 +75,49 @@ const convertInputIntoAction = (input: string): Action | null => {
   }
 
   return null;
+};
+
+const handlePrompt = async (input: { prompt: string }) => {
+  const actionsString = JSON.stringify(actionsToChatGPT);
+  const rawMessages = [
+    "As 'LillIA', I receive a prompt and select the correct action from a JSON containing many actions. I only return the JSON.",
+    "The actions and schemaInput in JSON format are:",
+    actionsString,
+    "-------",
+    `Given the user prompt: "${input.prompt}", return only the JSON output according to the schema:`,
+    `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action */ }`,
+    "If the user doesn't provide all input values, generate appropriate values based on context and action.",
+    "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
+    "Return just the JSON output, without extra context or explanation.",
+  ].join("\n ");
+  const messages: ChatCompletionRequestMessage[] = [
+    { role: "system", content: rawMessages },
+  ];
+  const completion = await openai.createChatCompletion({
+    model: "gpt-3.5-turbo",
+    messages,
+  });
+
+  console.log("===============");
+  console.log(completion.data.usage);
+  console.log("===============");
+
+  let jsonResult: Record<string, unknown> | null = null;
+
+  const response = convertInputIntoAction(
+    completion.data.choices[0]?.message?.content ?? "{}",
+  );
+
+  if (response) {
+    const { handle, input } = response;
+    const result = await handle(input);
+    jsonResult = result;
+  }
+  return {
+    result: completion.data.choices.map((c) => c.message?.content),
+    messages: messages.map((m) => m.content),
+    jsonResult,
+  };
 };
 
 export const openAiRouter = createTRPCRouter({
@@ -118,47 +164,7 @@ export const openAiRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       try {
-        const actionsString = JSON.stringify(actionsToChatGPT);
-
-        const rawMessages = [
-          "As 'LillIA', I receive a prompt and select the correct action from a JSON containing many actions. I only return the JSON.",
-          "The actions and schemaInput in JSON format are:",
-          actionsString,
-          "-------",
-          `Given the user prompt: "${input.prompt}", return only the JSON output according to the schema:`,
-          `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action */ }`,
-          "If the user doesn't provide all input values, generate appropriate values based on context and action.",
-          "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
-          "Return just the JSON output, without extra context or explanation.",
-        ].join("\n ");
-        const messages: ChatCompletionRequestMessage[] = [
-          { role: "system", content: rawMessages },
-        ];
-        const completion = await openai.createChatCompletion({
-          model: "gpt-3.5-turbo",
-          messages,
-        });
-
-        console.log("===============");
-        console.log(completion.data.usage);
-        console.log("===============");
-
-        let jsonResult: Record<string, unknown> | null = null;
-
-        const response = convertInputIntoAction(
-          completion.data.choices[0]?.message?.content ?? "{}",
-        );
-
-        if (response) {
-          const { handle, input } = response;
-          const result = await handle(input);
-          jsonResult = result;
-        }
-        return {
-          result: completion.data.choices.map((c) => c.message?.content),
-          messages: messages.map((m) => m.content),
-          jsonResult,
-        };
+        return await handlePrompt(input);
       } catch (err) {
         // check if is axios error
         if (axios.isAxiosError(err)) {
