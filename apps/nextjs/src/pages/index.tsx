@@ -81,13 +81,15 @@ const CreatePostForm: React.FC = () => {
 };
 
 const Home: NextPage = () => {
+  const [prompt, setPrompt] = useState("");
   const postQuery = api.post.all.useQuery();
 
   const deletePostMutation = api.post.delete.useMutation({
     onSettled: () => postQuery.refetch(),
   });
 
-  const {mutateAsync: tellJoke} = api.openAi.tellJoke.useMutation();
+  const { mutateAsync: tellJoke } = api.openAi.tellJoke.useMutation();
+  const { mutateAsync: handlePrompt } = api.openAi.handlePrompt.useMutation();
 
   return (
     <>
@@ -104,13 +106,38 @@ const Home: NextPage = () => {
 
           <CreatePostForm />
 
-          <button onClick={async () => {
-            const prompt = "Javascript";
-            const response = await tellJoke({ prompt });
-            console.log({ response, prompt })
-          }}>
-            send prompt
+          <button
+            onClick={async () => {
+              const prompt =
+                "A joke about Francielle, my girlfriend, that likes Typescript";
+              const response = await tellJoke({ prompt });
+              console.log({ response, prompt });
+            }}
+          >
+            tellJoke
           </button>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              name="prompt"
+              id=""
+              onChange={(e) => setPrompt(e.target.value)}
+              value={prompt}
+              className="rounded p-1 text-black"
+            />
+            <button
+              className="rounded bg-pink-400 p-2 font-bold"
+              onClick={async () => {
+                if (!prompt) return;
+                const response = await handlePrompt({ prompt });
+                console.log({ response, prompt });
+                setPrompt("");
+                await postQuery.refetch();
+              }}
+            >
+              send prompt
+            </button>
+          </div>
 
           {postQuery.data ? (
             <div className="w-full max-w-2xl">
