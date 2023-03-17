@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@acme/db": "*",
+    "@acme/whisper": "*",
     "@trpc/client": "^10.14.0",
     "@trpc/server": "^10.14.0",
     "axios": "^1.3.4",

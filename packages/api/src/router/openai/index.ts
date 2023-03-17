@@ -10,6 +10,7 @@ import {
 import { z } from "zod";
 
 import { prisma } from "@acme/db";
+import { createWhisper, saveBufferToWav } from "@acme/whisper";
 
 import { createTRPCRouter, publicProcedure } from "../../trpc";
 import {
@@ -307,5 +308,24 @@ export const openAiRouter = createTRPCRouter({
           error: 500,
         };
       }
+    }),
+
+  handleAudioPrompt: publicProcedure
+    .input(
+      z.object({
+        /**
+         * const binaryData = await e.data.arrayBuffer();
+         * const base64Data = Buffer.from(binaryData).toString("base64");
+         */
+        prompt: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const { prompt } = input;
+      const whisper = await createWhisper();
+
+      const transcription = await whisper.transcriptFromB64(prompt);
+      const response = await handlePrompt({ prompt: transcription });
+      return response;
     }),
 });
