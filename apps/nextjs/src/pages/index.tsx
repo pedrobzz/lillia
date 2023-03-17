@@ -6,13 +6,11 @@ import Head from "next/head";
 import { api, type RouterOutputs } from "~/utils/api";
 
 const Recorder: React.FC = () => {
-  const [stream, setStream] = useState<MediaStream | null>(null);
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
 
   const utils = api.useContext();
-  const { mutate: handleAudioPrompt } =
+  const { mutate: handleAudioPrompt, isLoading } =
     api.openAi.handleAudioPrompt.useMutation({
       onSettled: () => utils.post.all.invalidate(),
     });
@@ -22,7 +20,6 @@ const Recorder: React.FC = () => {
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
-        setStream(stream);
         const recorder = new MediaRecorder(stream);
         setRecorder(recorder);
 
@@ -38,9 +35,9 @@ const Recorder: React.FC = () => {
       }
       if (isRecording) {
         setIsRecording(false);
-        setAudioUrl(null);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleStartRecording = () => {
@@ -56,46 +53,33 @@ const Recorder: React.FC = () => {
   };
 
   const handleDataAvailable = async (e: BlobEvent) => {
-    const url = URL.createObjectURL(e.data);
-    setAudioUrl(url);
     const binaryData = await e.data.arrayBuffer();
     const base64Data = Buffer.from(binaryData).toString("base64");
     handleAudioPrompt({ prompt: base64Data });
   };
 
-  const handleDownload = () => {
-    if (!audioUrl) return;
-    const link = document.createElement("a");
-    link.href = audioUrl;
-    link.download = "recording.wav";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
     <div className="flex items-center justify-center gap-2 ">
-      <button
-        onClick={handleStartRecording}
-        disabled={isRecording}
-        className="rounded bg-blue-500 py-2 px-4 font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-      >
-        Record
-      </button>
-      <button
-        onClick={handleStopRecording}
-        disabled={!isRecording}
-        className="rounded bg-red-500 py-2 px-4 font-bold text-white hover:bg-red-700 disabled:opacity-50"
-      >
-        Stop
-      </button>
-      <button
-        onClick={handleDownload}
-        disabled={!audioUrl}
-        className="rounded bg-green-500 py-2 px-4 font-bold text-white hover:bg-green-700 disabled:opacity-50"
-      >
-        Download
-      </button>
+      {!isRecording ? (
+        <button
+          onClick={handleStartRecording}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded bg-blue-500 py-2 px-4 font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Record
+          {isLoading && (
+            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-white"></div>
+          )}
+        </button>
+      ) : (
+        <button
+          onClick={handleStopRecording}
+          disabled={!isRecording}
+          className="rounded bg-red-500 py-2 px-4 font-bold text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          Stop
+        </button>
+      )}
     </div>
   );
 };
