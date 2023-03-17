@@ -44,9 +44,7 @@ const actionsToChatGPT = {
     },
   },
   "post.delete": {
-    input: {
-      id: "",
-    },
+    input: {},
   },
 } as const;
 
@@ -218,7 +216,6 @@ export const openAiRouter = createTRPCRouter({
           result: completion.data.choices,
         };
       } catch (err) {
-        // check if is axios error
         if (axios.isAxiosError(err)) {
           console.log(err.message);
           console.log(err.response?.data);
@@ -239,7 +236,6 @@ export const openAiRouter = createTRPCRouter({
       try {
         return await handlePrompt(input);
       } catch (err) {
-        // check if is axios error
         if (axios.isAxiosError(err)) {
           console.log(err.message);
           console.log(err.response?.data);
