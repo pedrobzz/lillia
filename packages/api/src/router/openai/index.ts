@@ -15,8 +15,10 @@ import { createTRPCRouter, publicProcedure } from "../../trpc";
 import {
   createPostSchema,
   deletePostSchema,
+  updatePostSchema,
   type CreatePostSchema,
   type DeletePostSchema,
+  type UpdatePostSchema,
 } from "../post/schema";
 import { createPost } from "../post/service";
 
@@ -32,7 +34,7 @@ interface Action {
     // prompt: string;
     input: unknown;
   }) => Promise<Record<string, unknown>>;
-  input: unknown;
+  input?: unknown;
   schema?: z.ZodSchema<unknown>;
 }
 
@@ -43,9 +45,9 @@ const actionsToChatGPT = {
       title: "",
     },
   },
-  "post.delete": {
-    input: {},
-  },
+  "post.delete": {},
+
+  "post.update": {},
 } as const;
 
 const actions = {
@@ -103,10 +105,69 @@ const actions = {
       const parsed = deletePostSchema.safeParse({ id });
       if (!parsed.success) throw new Error(`Invalid Input: ${id}`);
 
-      await prisma.post.delete({
+      return await prisma.post.delete({
         where: { id: parsed.data.id },
       });
-      return {};
+    },
+  },
+  "post.update": {
+    schema: updatePostSchema,
+    input: {
+      id: "",
+    } as UpdatePostSchema,
+    handle: async (args) => {
+      const { context } = args;
+      const allPosts = await prisma.post.findMany({
+        select: {
+          id: true,
+          content: true,
+          title: true,
+        },
+      });
+
+      const rawMessages = [
+        "As 'LillIA', You need to select a post to update",
+        "The posts are:",
+        JSON.stringify(allPosts),
+        `Given the user prompt: "${context.prompt}", return only the updated as a JSON according to the schema:`,
+        `{ "id", "title", "content" }`,
+        "-------",
+        "Return Just the JSON, without extra context or explanation.",
+        'If you can\'t find a post to delete, return only "{}"',
+      ].join("\n");
+
+      const completion = await openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "system", content: rawMessages }],
+      });
+
+      console.log("===============");
+      console.log(completion.data.usage);
+      console.log("===============");
+
+      const input = JSON.parse(
+        completion.data.choices[0]?.message?.content?.trim() ?? "{}",
+      );
+
+      if (!input || input === "{}") {
+        console.log("No input");
+        console.log(input);
+        console.log(
+          completion.data.choices[0]?.message?.content?.trim() ?? "{}",
+        );
+        return {};
+      }
+
+      const parsed = updatePostSchema.safeParse(input);
+      if (!parsed.success) throw new Error(`Invalinput Input: ${input}`);
+
+      return await prisma.post.update({
+        where: { id: parsed.data.id },
+        data: {
+          title: parsed.data.title,
+          content: parsed.data.content,
+        },
+      });
     },
   },
 } satisfies Record<keyof typeof actionsToChatGPT, Action>;
@@ -147,7 +208,7 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
     actionsString,
     "-------",
     `Given the user prompt: "${prompt}", return only the JSON output according to the schema:`,
-    `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action */ }`,
+    `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action. This shouldn't be present if there's no schemaInput */ }`,
     "If the user doesn't provide all input values, generate appropriate values based on context and action.",
     "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
     "Return just the JSON output, without extra context or explanation. If you can't do this, return only '{}'",
