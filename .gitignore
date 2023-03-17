@@ -47,3 +47,5 @@ yarn-error.log*
 # turbo
 .turbo
 packages/db/prisma/db.sqlite
+packages/whisper/audios/*.wav
+packages/whisper/bin/models/*.bin

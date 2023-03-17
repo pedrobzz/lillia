@@ -4,4 +4,5 @@ packages:
   - packages/api
   # - packages/auth
   - packages/db
+  - packages/whisper
   - packages/config/*
