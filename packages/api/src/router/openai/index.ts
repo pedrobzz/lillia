@@ -1,14 +1,23 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+
 import axios from "axios";
 import {
   Configuration,
   OpenAIApi,
   type ChatCompletionRequestMessage,
+  type CreateChatCompletionResponse,
 } from "openai";
 import { z } from "zod";
 
+import { prisma } from "@acme/db";
+
 import { createTRPCRouter, publicProcedure } from "../../trpc";
-import { createPostSchema, type CreatePostSchema } from "../post/schema";
+import {
+  createPostSchema,
+  deletePostSchema,
+  type CreatePostSchema,
+  type DeletePostSchema,
+} from "../post/schema";
 import { createPost } from "../post/service";
 
 const configuration = new Configuration({
@@ -18,10 +27,13 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 interface Action {
-  handle: (input: unknown) => Promise<Record<string, unknown>>;
+  handle: (args: {
+    context: CreateChatCompletionResponse & { prompt: string };
+    // prompt: string;
+    input: unknown;
+  }) => Promise<Record<string, unknown>>;
   input: unknown;
   schema?: z.ZodSchema<unknown>;
-  preprocess?: (input: unknown) => unknown;
 }
 
 const actionsToChatGPT = {
@@ -29,6 +41,11 @@ const actionsToChatGPT = {
     input: {
       content: "",
       title: "",
+    },
+  },
+  "post.delete": {
+    input: {
+      id: "",
     },
   },
 } as const;
@@ -40,11 +57,58 @@ const actions = {
       content: "content",
       title: "title",
     } as CreatePostSchema,
-    handle: (input: unknown) => {
-      const parsed = createPostSchema.safeParse(input);
+    handle: (args) => {
+      const parsed = createPostSchema.safeParse(args.input);
       if (!parsed.success) throw new Error("Invalid input");
 
       return createPost(parsed.data);
+    },
+  },
+  "post.delete": {
+    schema: deletePostSchema,
+    input: {
+      id: "",
+    } as DeletePostSchema,
+    handle: async (args) => {
+      const { context } = args;
+      const allPosts = await prisma.post.findMany({
+        select: {
+          id: true,
+          content: true,
+          title: true,
+        },
+      });
+
+      const rawMessages = [
+        "As 'LillIA', You need to select a post to delete.",
+        "The posts are:",
+        JSON.stringify(allPosts),
+        `Given the user prompt: "${context.prompt}", return only the ID of the post that matches the context from the user:`,
+        "-------",
+        "Return just the ID output, without extra context or explanation. Only the ID, without anything else.",
+        "If you can't find a post to delete, return an empty string",
+      ].join("\n ");
+
+      const completion = await openai.createChatCompletion({
+        model: "gpt-3.5-turbo",
+        messages: [{ role: "system", content: rawMessages }],
+      });
+
+      console.log("===============");
+      console.log(completion.data.usage);
+      console.log("===============");
+
+      const id = completion.data.choices[0]?.message?.content?.trim();
+
+      if (!id) return {};
+
+      const parsed = deletePostSchema.safeParse({ id });
+      if (!parsed.success) throw new Error("Invalid input");
+
+      await prisma.post.delete({
+        where: { id: parsed.data.id },
+      });
+      return {};
     },
   },
 } satisfies Record<keyof typeof actionsToChatGPT, Action>;
@@ -64,7 +128,7 @@ const convertInputIntoAction = (input: string): Action | null => {
 
   if (parsed.success) {
     const { action } = parsed.data;
-    const actionObj = actions[action as keyof typeof actions];
+    const actionObj = actions[action];
 
     if (actionObj && "handle" in actionObj) {
       return {
@@ -77,14 +141,14 @@ const convertInputIntoAction = (input: string): Action | null => {
   return null;
 };
 
-const handlePrompt = async (input: { prompt: string }) => {
+const handlePrompt = async ({ prompt }: { prompt: string }) => {
   const actionsString = JSON.stringify(actionsToChatGPT);
   const rawMessages = [
     "As 'LillIA', I receive a prompt and select the correct action from a JSON containing many actions. I only return the JSON.",
     "The actions and schemaInput in JSON format are:",
     actionsString,
     "-------",
-    `Given the user prompt: "${input.prompt}", return only the JSON output according to the schema:`,
+    `Given the user prompt: "${prompt}", return only the JSON output according to the schema:`,
     `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action */ }`,
     "If the user doesn't provide all input values, generate appropriate values based on context and action.",
     "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
@@ -110,7 +174,10 @@ const handlePrompt = async (input: { prompt: string }) => {
 
   if (response) {
     const { handle, input } = response;
-    const result = await handle(input);
+    const result = await handle({
+      context: { ...completion.data, prompt: prompt },
+      input,
+    });
     jsonResult = result;
   }
   return {
