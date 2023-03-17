@@ -86,8 +86,8 @@ const actions = {
         `Given the user prompt: "${context.prompt}", return only the ID of the post that matches the context from the user:`,
         "-------",
         "Return just the ID output, without extra context or explanation. Only the ID, without anything else.",
-        "If you can't find a post to delete, return an empty string",
-      ].join("\n ");
+        'If you can\'t find a post to delete, return only "{}"',
+      ].join("\n");
 
       const completion = await openai.createChatCompletion({
         model: "gpt-3.5-turbo",
@@ -100,10 +100,10 @@ const actions = {
 
       const id = completion.data.choices[0]?.message?.content?.trim();
 
-      if (!id) return {};
+      if (!id || id === "{}") return {};
 
       const parsed = deletePostSchema.safeParse({ id });
-      if (!parsed.success) throw new Error("Invalid input");
+      if (!parsed.success) throw new Error(`Invalid Input: ${id}`);
 
       await prisma.post.delete({
         where: { id: parsed.data.id },
@@ -152,7 +152,7 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
     `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action */ }`,
     "If the user doesn't provide all input values, generate appropriate values based on context and action.",
     "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
-    "Return just the JSON output, without extra context or explanation.",
+    "Return just the JSON output, without extra context or explanation. If you can't do this, return only '{}'",
   ].join("\n ");
   const messages: ChatCompletionRequestMessage[] = [
     { role: "system", content: rawMessages },
@@ -168,17 +168,23 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
 
   let jsonResult: Record<string, unknown> | null = null;
 
-  const response = convertInputIntoAction(
-    completion.data.choices[0]?.message?.content ?? "{}",
-  );
+  try {
+    const response = convertInputIntoAction(
+      completion.data.choices[0]?.message?.content ?? "{}",
+    );
 
-  if (response) {
-    const { handle, input } = response;
-    const result = await handle({
-      context: { ...completion.data, prompt: prompt },
-      input,
-    });
-    jsonResult = result;
+    if (response) {
+      const { handle, input } = response;
+      const result = await handle({
+        context: { ...completion.data, prompt: prompt },
+        input,
+      });
+      jsonResult = result;
+    }
+  } catch (err) {
+    console.log(completion.data.choices[0]?.message?.content);
+    console.error(err);
+    throw err;
   }
   return {
     result: completion.data.choices.map((c) => c.message?.content),
