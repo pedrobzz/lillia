@@ -27,59 +27,6 @@ const PostCard: React.FC<{
   );
 };
 
-const CreatePostForm: React.FC = () => {
-  const utils = api.useContext();
-
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-
-  const { mutate, error } = api.post.create.useMutation({
-    async onSuccess() {
-      setTitle("");
-      setContent("");
-      await utils.post.all.invalidate();
-    },
-  });
-
-  return (
-    <div className="flex w-full max-w-2xl flex-col p-4">
-      <input
-        className="mb-2 rounded bg-white/10 p-2 text-white"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title"
-      />
-      {error?.data?.zodError?.fieldErrors.title && (
-        <span className="mb-2 text-red-500">
-          {error.data.zodError.fieldErrors.title}
-        </span>
-      )}
-      <input
-        className="mb-2 rounded bg-white/10 p-2 text-white"
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Content"
-      />
-      {error?.data?.zodError?.fieldErrors.content && (
-        <span className="mb-2 text-red-500">
-          {error.data.zodError.fieldErrors.content}
-        </span>
-      )}
-      <button
-        className="rounded bg-pink-400 p-2 font-bold"
-        onClick={() => {
-          mutate({
-            title,
-            content,
-          });
-        }}
-      >
-        Create
-      </button>
-    </div>
-  );
-};
-
 const Home: NextPage = () => {
   const [prompt, setPrompt] = useState("");
   const postQuery = api.post.all.useQuery();
@@ -88,8 +35,8 @@ const Home: NextPage = () => {
     onSettled: () => postQuery.refetch(),
   });
 
-  const { mutateAsync: tellJoke } = api.openAi.tellJoke.useMutation();
-  const { mutateAsync: handlePrompt } = api.openAi.handlePrompt.useMutation();
+  const { mutateAsync: handlePrompt, isLoading: openAiLoading } =
+    api.openAi.handlePrompt.useMutation();
 
   return (
     <>
@@ -104,18 +51,6 @@ const Home: NextPage = () => {
             Lill<span className="text-pink-400">IA</span>
           </h1>
 
-          <CreatePostForm />
-
-          <button
-            onClick={async () => {
-              const prompt =
-                "A joke about Francielle, my girlfriend, that likes Typescript";
-              const response = await tellJoke({ prompt });
-              console.log({ response, prompt });
-            }}
-          >
-            tellJoke
-          </button>
           <div className="flex gap-2">
             <input
               type="text"
@@ -126,7 +61,8 @@ const Home: NextPage = () => {
               className="rounded p-1 text-black"
             />
             <button
-              className="rounded bg-pink-400 p-2 font-bold"
+              className="rounded bg-pink-400 p-2 font-bold disabled:opacity-50"
+              disabled={openAiLoading}
               onClick={async () => {
                 if (!prompt) return;
                 const response = await handlePrompt({ prompt });
