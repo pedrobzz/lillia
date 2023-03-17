@@ -10,7 +10,7 @@ import {
 import { z } from "zod";
 
 import { prisma } from "@acme/db";
-import { createWhisper, saveBufferToWav } from "@acme/whisper";
+import { createWhisper } from "@acme/whisper";
 
 import { createTRPCRouter, publicProcedure } from "../../trpc";
 import {

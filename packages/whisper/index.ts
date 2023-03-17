@@ -1,5 +1,5 @@
 import fs from "fs";
-import { $, execa } from "execa";
+import { execa } from "execa";
 
 type Model = "tiny" | "base" | "small" | "medium" | "large";
 
