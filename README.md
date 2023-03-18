@@ -47,6 +47,7 @@ I also use [Whisper.cpp](https://github.com/ggerganov/whisper.cpp/blob/master/LI
 
 - [OpenAI](https://openai.com/) for creating GPT-3 and GPT-3.5-turbo;
 - [Whisper.cpp](https://github.com/ggerganov/whisper.cpp) for creating a C++ implementation of OpenAI's whisper;
+- The T3-OSS team for creating [create-t3-turbo](https://github.com/t3-oss/create-t3-turbo);
 - My future girlfriend for being patient with me and my projects, I love you so much <3;
 - ChatGPT for helping me figure out how to record audio, because I had no idea how to do it :);
 - Everyone who read this far, you are awesome, thank you for reading this, I love you too <3
