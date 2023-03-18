@@ -12,7 +12,7 @@ const Recorder: React.FC = () => {
   const utils = api.useContext();
   const { mutate: handleAudioPrompt, isLoading } =
     api.openAi.handleAudioPrompt.useMutation({
-      onSettled: () => utils.post.all.invalidate(),
+      onSettled: () => utils.todo.all.invalidate(),
     });
 
   useEffect(() => {
@@ -84,20 +84,20 @@ const Recorder: React.FC = () => {
   );
 };
 
-const PostCard: React.FC<{
-  post: RouterOutputs["post"]["all"][number];
-  onPostDelete?: () => void;
-}> = ({ post, onPostDelete }) => {
+const TodoCard: React.FC<{
+  todo: RouterOutputs["todo"]["all"][number];
+  onTodoDelete?: () => void;
+}> = ({ todo, onTodoDelete }) => {
   return (
     <div className="flex flex-row rounded-lg bg-white/10 p-4 transition-all hover:scale-[101%]">
       <div className="flex-grow">
-        <h2 className="text-2xl font-bold text-pink-400">{post.title}</h2>
-        <p className="mt-2 text-sm">{post.content}</p>
+        <h2 className="text-2xl font-bold text-pink-400">{todo.title}</h2>
+        <p className="mt-2 text-sm">{todo.content}</p>
       </div>
       <div>
         <span
           className="cursor-pointer text-sm font-bold uppercase text-pink-400"
-          onClick={onPostDelete}
+          onClick={onTodoDelete}
         >
           Delete
         </span>
@@ -108,9 +108,9 @@ const PostCard: React.FC<{
 
 const Home: NextPage = () => {
   const [prompt, setPrompt] = useState("");
-  const postQuery = api.post.all.useQuery();
+  const postQuery = api.todo.all.useQuery();
 
-  const deletePostMutation = api.post.delete.useMutation({
+  const deleteTodoMutation = api.todo.delete.useMutation({
     onSettled: () => postQuery.refetch(),
   });
 
@@ -167,10 +167,10 @@ const Home: NextPage = () => {
                   <div className="flex w-full flex-col gap-4">
                     {postQuery.data?.map((p) => {
                       return (
-                        <PostCard
+                        <TodoCard
                           key={p.id}
-                          post={p}
-                          onPostDelete={() => deletePostMutation.mutate(p.id)}
+                          todo={p}
+                          onTodoDelete={() => deleteTodoMutation.mutate(p.id)}
                         />
                       );
                     })}

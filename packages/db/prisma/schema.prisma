@@ -10,8 +10,14 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Post {
-    id      String @id @default(cuid())
-    title   String
-    content String
+model Todo {
+    id        String @id @default(cuid())
+    title     String
+    content   String
+
+    status    String @default("todo")
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
 }
+

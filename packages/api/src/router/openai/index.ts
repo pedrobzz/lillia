@@ -14,14 +14,14 @@ import { createWhisper } from "@acme/whisper";
 
 import { createTRPCRouter, publicProcedure } from "../../trpc";
 import {
-  createPostSchema,
-  deletePostSchema,
-  updatePostSchema,
-  type CreatePostSchema,
-  type DeletePostSchema,
-  type UpdatePostSchema,
-} from "../post/schema";
-import { createPost } from "../post/service";
+  createTodoSchema,
+  deleteTodoSchema,
+  updateTodoSchema,
+  type CreateTodoSchema,
+  type DeleteTodoSchema,
+  type UpdateTodoSchema,
+} from "../todo/schema";
+import { createTodo } from "../todo/service";
 
 const configuration = new Configuration({
   apiKey: process.env.OPENAI_API_KEY || "",
@@ -40,39 +40,39 @@ interface Action {
 }
 
 const actionsToChatGPT = {
-  "post.create": {
+  "todo.create": {
     input: {
       content: "",
       title: "",
     },
   },
-  "post.delete": {},
+  "todo.delete": {},
 
-  "post.update": {},
+  "todo.update": {},
 } as const;
 
 const actions = {
-  "post.create": {
-    schema: createPostSchema,
+  "todo.create": {
+    schema: createTodoSchema,
     input: {
       content: "content",
       title: "title",
-    } as CreatePostSchema,
+    } as CreateTodoSchema,
     handle: (args) => {
-      const parsed = createPostSchema.safeParse(args.input);
+      const parsed = createTodoSchema.safeParse(args.input);
       if (!parsed.success) throw new Error("Invalid input");
 
-      return createPost(parsed.data);
+      return createTodo(parsed.data);
     },
   },
-  "post.delete": {
-    schema: deletePostSchema,
+  "todo.delete": {
+    schema: deleteTodoSchema,
     input: {
       id: "",
-    } as DeletePostSchema,
+    } as DeleteTodoSchema,
     handle: async (args) => {
       const { context } = args;
-      const allPosts = await prisma.post.findMany({
+      const allTodos = await prisma.todo.findMany({
         select: {
           id: true,
           content: true,
@@ -81,13 +81,13 @@ const actions = {
       });
 
       const rawMessages = [
-        "As 'LillIA', You need to select a post to delete.",
+        "As 'LillIA', You need to select a todo to delete.",
         "The posts are:",
-        JSON.stringify(allPosts),
-        `Given the user prompt: "${context.prompt}", return only the ID of the post that matches the context from the user:`,
+        JSON.stringify(allTodos),
+        `Given the user prompt: "${context.prompt}", return only the ID of the todo that matches the context from the user:`,
         "-------",
         "Return just the ID output, without extra context or explanation. Only the ID, without anything else.",
-        'If you can\'t find a post to delete, return only "{}"',
+        'If you can\'t find a todo to delete, return only "{}"',
       ].join("\n");
 
       const completion = await openai.createChatCompletion({
@@ -103,22 +103,22 @@ const actions = {
 
       if (!id || id === "{}") return {};
 
-      const parsed = deletePostSchema.safeParse({ id });
+      const parsed = deleteTodoSchema.safeParse({ id });
       if (!parsed.success) throw new Error(`Invalid Input: ${id}`);
 
-      return await prisma.post.delete({
+      return await prisma.todo.delete({
         where: { id: parsed.data.id },
       });
     },
   },
-  "post.update": {
-    schema: updatePostSchema,
+  "todo.update": {
+    schema: updateTodoSchema,
     input: {
       id: "",
-    } as UpdatePostSchema,
+    } as UpdateTodoSchema,
     handle: async (args) => {
       const { context } = args;
-      const allPosts = await prisma.post.findMany({
+      const allTodos = await prisma.todo.findMany({
         select: {
           id: true,
           content: true,
@@ -127,14 +127,14 @@ const actions = {
       });
 
       const rawMessages = [
-        "As 'LillIA', You need to select a post to update",
+        "As 'LillIA', You need to select a todo to update",
         "The posts are:",
-        JSON.stringify(allPosts),
+        JSON.stringify(allTodos),
         `Given the user prompt: "${context.prompt}", return only the updated as a JSON according to the schema:`,
         `{ "id", "title", "content" }`,
         "-------",
         "Return Just the JSON, without extra context or explanation.",
-        'If you can\'t find a post to delete, return only "{}"',
+        'If you can\'t find a todo to delete, return only "{}"',
       ].join("\n");
 
       const completion = await openai.createChatCompletion({
@@ -159,10 +159,10 @@ const actions = {
         return {};
       }
 
-      const parsed = updatePostSchema.safeParse(input);
+      const parsed = updateTodoSchema.safeParse(input);
       if (!parsed.success) throw new Error(`Invalinput Input: ${input}`);
 
-      return await prisma.post.update({
+      return await prisma.todo.update({
         where: { id: parsed.data.id },
         data: {
           title: parsed.data.title,
@@ -209,9 +209,9 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
     actionsString,
     "-------",
     `Given the user prompt: "${prompt}", return only the JSON output according to the schema:`,
-    `{ "action": /* e.g. post.createPost */, "input": /* schemaInput for the action. This shouldn't be present if there's no schemaInput */ }`,
+    `{ "action": /* e.g. todo.createTodo */, "input": /* schemaInput for the action. This shouldn't be present if there's no schemaInput */ }`,
     "If the user doesn't provide all input values, generate appropriate values based on context and action.",
-    "For example, if the action is post.createPost and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
+    "For example, if the action is todo.createTodo and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
     "Return just the JSON output, without extra context or explanation. If you can't do this, return only '{}'",
   ].join("\n ");
   const messages: ChatCompletionRequestMessage[] = [

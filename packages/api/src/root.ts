@@ -1,9 +1,9 @@
 import { openAiRouter } from "./router/openai";
-import { postRouter } from "./router/post";
+import { todoRouter } from "./router/todo";
 import { createTRPCRouter } from "./trpc";
 
 export const appRouter = createTRPCRouter({
-  post: postRouter,
+  todo: todoRouter,
   openAi: openAiRouter,
 });
 
