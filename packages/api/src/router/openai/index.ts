@@ -16,6 +16,7 @@ import { createTRPCRouter, publicProcedure } from "../../trpc";
 import {
   createTodoSchema,
   deleteTodoSchema,
+  todoPossibleStatus,
   updateTodoSchema,
   type CreateTodoSchema,
   type DeleteTodoSchema,
@@ -44,6 +45,7 @@ const actionsToChatGPT = {
     input: {
       content: "",
       title: "",
+      status: `Enum(${todoPossibleStatus.join(",")})`,
     },
   },
   "todo.delete": {},
@@ -131,7 +133,9 @@ const actions = {
         "The posts are:",
         JSON.stringify(allTodos),
         `Given the user prompt: "${context.prompt}", return only the updated as a JSON according to the schema:`,
-        `{ "id", "title", "content" }`,
+        `{ "id", "title", "content", "status" }`,
+        `Possible Status: ${todoPossibleStatus.join(", ")}`,
+        `only the field "id" is required, so you don't need to provide the other fields if you don't want to update them.`,
         "-------",
         "Return Just the JSON, without extra context or explanation.",
         'If you can\'t find a todo to delete, return only "{}"',
@@ -160,13 +164,13 @@ const actions = {
       }
 
       const parsed = updateTodoSchema.safeParse(input);
-      if (!parsed.success) throw new Error(`Invalinput Input: ${input}`);
-
+      if (!parsed.success) throw new Error(`Invalid Input: ${input}`);
       return await prisma.todo.update({
         where: { id: parsed.data.id },
         data: {
           title: parsed.data.title,
           content: parsed.data.content,
+          status: parsed.data.status,
         },
       });
     },
@@ -209,7 +213,7 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
     actionsString,
     "-------",
     `Given the user prompt: "${prompt}", return only the JSON output according to the schema:`,
-    `{ "action": /* e.g. todo.createTodo */, "input": /* schemaInput for the action. This shouldn't be present if there's no schemaInput */ }`,
+    `{ "action": /* e.g. todo.createTodo */, "input": /* schemaInput for the action. This shouldn't be present if there's no schemaInput. */ }`,
     "If the user doesn't provide all input values, generate appropriate values based on context and action.",
     "For example, if the action is todo.createTodo and only the title is provided, create suitable content based on the title and context. You can be really creative here!",
     "Return just the JSON output, without extra context or explanation. If you can't do this, return only '{}'",
@@ -322,7 +326,9 @@ export const openAiRouter = createTRPCRouter({
     )
     .mutation(async ({ input }) => {
       const { prompt } = input;
-      const whisper = await createWhisper();
+      const whisper = await createWhisper({
+        model: "small",
+      });
 
       const transcription = await whisper.transcriptFromB64(prompt);
       const response = await handlePrompt({ prompt: transcription });
