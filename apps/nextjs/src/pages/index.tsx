@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { NextPage } from "next";
 import Head from "next/head";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -92,7 +93,12 @@ const TodoCard: React.FC<{
   onTodoDelete?: () => void;
 }> = ({ todo, onTodoDelete }) => {
   return (
-    <div className="flex flex-row gap-4 rounded-lg bg-white/10 py-4 px-6 transition-all hover:scale-[101%]">
+    <motion.div
+      className="flex flex-row gap-4 rounded-lg bg-white/10 py-4 px-6 transition-all hover:scale-[101%]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
       <div className="flex-grow">
         <h2 className="text-3xl font-bold text-white">{todo.title}</h2>
         <p className="mt-2 text-lg text-neutral-200">{todo.content}</p>
@@ -105,7 +111,7 @@ const TodoCard: React.FC<{
           X
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 };
 
@@ -138,24 +144,26 @@ const TodoList = ({ todos }: { todos: RouterOutputs["todo"]["all"] }) => {
 
   return (
     <div className="w-full px-10">
-      <div className="grid grid-cols-3 gap-8">
-        {objectEntries(todosByStatus).map(([key, value]) => {
-          return (
-            <div key={key} className="flex flex-col items-center ">
-              <h2 className="text-5xl font-bold text-white">{key}</h2>
-              <div className="mt-4 ">
-                {value.map((todo) => (
-                  <TodoCard
-                    key={todo.id}
-                    todo={todo}
-                    onTodoDelete={() => deleteTodoMutation.mutate(todo.id)}
-                  />
-                ))}
+      <AnimatePresence>
+        <div className="grid grid-cols-3 gap-8">
+          {objectEntries(todosByStatus).map(([key, value]) => {
+            return (
+              <div key={key} className="flex flex-col items-center ">
+                <h2 className="text-5xl font-bold text-white">{key}</h2>
+                <div className="mt-4 space-y-3">
+                  {value.map((todo) => (
+                    <TodoCard
+                      key={todo.id}
+                      todo={todo}
+                      onTodoDelete={() => deleteTodoMutation.mutate(todo.id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      </AnimatePresence>
     </div>
   );
 };
