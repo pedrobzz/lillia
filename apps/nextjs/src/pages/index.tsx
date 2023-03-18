@@ -1,9 +1,12 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { NextPage } from "next";
 import Head from "next/head";
 
 import { api, type RouterOutputs } from "~/utils/api";
+
+const objectEntries = <T extends Record<string, unknown>>(obj: T) =>
+  Object.entries(obj) as [keyof T, T[keyof T]][];
 
 const Recorder: React.FC = () => {
   const [recorder, setRecorder] = useState<MediaRecorder | null>(null);
@@ -106,13 +109,60 @@ const TodoCard: React.FC<{
   );
 };
 
+const TodoList = ({ todos }: { todos: RouterOutputs["todo"]["all"] }) => {
+  const todosByStatus = useMemo(
+    () =>
+      todos.reduce(
+        (acc, todo) => {
+          if (todo.status === "todo") {
+            acc.todo.push(todo);
+          } else if (todo.status === "doing") {
+            acc.doing.push(todo);
+          } else if (todo.status === "done") {
+            acc.done.push(todo);
+          }
+          return acc;
+        },
+        { todo: [], doing: [], done: [] } as {
+          todo: RouterOutputs["todo"]["all"];
+          doing: RouterOutputs["todo"]["all"];
+          done: RouterOutputs["todo"]["all"];
+        },
+      ),
+    [todos],
+  );
+  const utils = api.useContext();
+  const deleteTodoMutation = api.todo.delete.useMutation({
+    onSettled: () => utils.todo.all.invalidate(),
+  });
+
+  return (
+    <div className="w-full px-10">
+      <div className="grid grid-cols-3 gap-12">
+        {objectEntries(todosByStatus).map(([key, value]) => {
+          return (
+            <div key={key} className="flex flex-col items-center">
+              <h2 className="text-2xl font-bold text-pink-400">{key}</h2>
+              <div className="mt-4">
+                {value.map((todo) => (
+                  <TodoCard
+                    key={todo.id}
+                    todo={todo}
+                    onTodoDelete={() => deleteTodoMutation.mutate(todo.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const Home: NextPage = () => {
   const [prompt, setPrompt] = useState("");
   const postQuery = api.todo.all.useQuery();
-
-  const deleteTodoMutation = api.todo.delete.useMutation({
-    onSettled: () => postQuery.refetch(),
-  });
 
   const { mutateAsync: handlePrompt, isLoading: openAiLoading } =
     api.openAi.handlePrompt.useMutation();
@@ -159,25 +209,7 @@ const Home: NextPage = () => {
             <Recorder />
           </div>
           {postQuery.data ? (
-            <div className="w-full max-w-2xl">
-              {postQuery.data?.length === 0 ? (
-                <span>There are no posts!</span>
-              ) : (
-                <div className="flex  justify-center overflow-y-auto px-4 text-2xl">
-                  <div className="flex w-full flex-col gap-4">
-                    {postQuery.data?.map((p) => {
-                      return (
-                        <TodoCard
-                          key={p.id}
-                          todo={p}
-                          onTodoDelete={() => deleteTodoMutation.mutate(p.id)}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
+            <TodoList todos={postQuery.data} />
           ) : (
             <p>Loading...</p>
           )}
