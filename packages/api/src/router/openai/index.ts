@@ -43,9 +43,9 @@ interface Action {
 const actionsToChatGPT = {
   "todo.create": {
     input: {
-      content: "",
-      title: "",
-      status: `Enum(${todoPossibleStatus.join(",")})`,
+      content: "REQUIRED",
+      title: "REQUIRED",
+      status: `Enum(${todoPossibleStatus.join(",")}) REQUIRED`,
     },
   },
   "todo.delete": {},
@@ -229,6 +229,10 @@ const handlePrompt = async ({ prompt }: { prompt: string }) => {
   console.log("===============");
   console.log(completion.data.usage);
   console.log("===============");
+
+  if (completion.data.usage?.completion_tokens === 2) {
+    console.log(`Input: ${prompt}`);
+  }
 
   let jsonResult: Record<string, unknown> | null = null;
 
